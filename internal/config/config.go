@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/JunBSer/FileManager/internal/repository"
 	"github.com/JunBSer/FileManager/internal/transport/grpc"
 	"github.com/JunBSer/FileManager/internal/transport/http"
 	"github.com/ilyakaznacheev/cleanenv"
@@ -8,10 +9,11 @@ import (
 
 type (
 	Config struct {
-		App    App
-		Logger Log
-		GRPc   grpc.Config
-		Http   http.Config
+		App     App
+		Logger  Log
+		GRPc    grpc.Config
+		Http    http.Config
+		Storage repository.FileStorageConfig
 	}
 
 	App struct {

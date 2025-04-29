@@ -17,17 +17,30 @@ const (
 	CreateAndOpen
 )
 
+type FileStorageConfig struct {
+	storagePath string `env:"FILE_STORAGE_PATH" envDefault:"/var/tmp/storage"`
+	maxSize     int64  `env:"FILE_MAX_SIZE" envDefault:"10"`
+	readSize    int64  `env:"FILE_READ_SIZE" envDefault:"2048"`
+}
+
 type FileRepository interface {
-	GetFileHandle(ctx context.Context, path string) (*os.File, error)
-	AppendData(ctx context.Context, file *os.File, data []byte, pos int64) (int, error)
+	GetFileHandle(ctx context.Context, path string, openOption int) (FileHandle, error)
+	AppendData(ctx context.Context, file FileHandle, data []byte, pos int64) (int, error)
 	CopyFile(ctx context.Context, srcPath string, dstPath string) error
 	DeleteFile(ctx context.Context, path string) error
-	ReadFile(ctx context.Context, file *os.File, pos int64) ([]byte, int64, error)
+	ReadFile(ctx context.Context, file FileHandle, pos int64) ([]byte, int64, error)
 }
 type FileStorageRepo struct {
 	storagePath string
 	maxSize     int64
 	readSize    int64
+}
+
+type FileHandle interface {
+	Seek(offset int64, whence int) (ret int64, err error)
+	Write(b []byte) (n int, err error)
+	Close() error
+	Read(b []byte) (n int, err error)
 }
 
 func New(storagePath string, maxSize int64) *FileStorageRepo {
@@ -64,7 +77,7 @@ func (repo *FileStorageRepo) ValidatePath(ctx context.Context, path string) erro
 	return nil
 }
 
-func (repo *FileStorageRepo) GetFileHandle(ctx context.Context, path string, openOption int) (*os.File, error) {
+func (repo *FileStorageRepo) GetFileHandle(ctx context.Context, path string, openOption int) (FileHandle, error) {
 	fullPath := repo.BuildPath(path)
 	lg := logger.GetLoggerFromContext(ctx)
 
@@ -94,7 +107,7 @@ func (repo *FileStorageRepo) GetFileHandle(ctx context.Context, path string, ope
 	return file, nil
 }
 
-func (repo *FileStorageRepo) AppendData(ctx context.Context, file *os.File, data []byte, pos int64) (int, error) {
+func (repo *FileStorageRepo) AppendData(ctx context.Context, file FileHandle, data []byte, pos int64) (int, error) {
 	var err error
 	lg := logger.GetLoggerFromContext(ctx)
 
@@ -183,7 +196,7 @@ func (repo *FileStorageRepo) DeleteFile(ctx context.Context, path string) error 
 	return err
 }
 
-func (repo *FileStorageRepo) ReadFile(ctx context.Context, file *os.File, pos int64) ([]byte, int64, error) {
+func (repo *FileStorageRepo) ReadFile(ctx context.Context, file FileHandle, pos int64) ([]byte, int64, error) {
 	lg := logger.GetLoggerFromContext(ctx)
 
 	_, err := file.Seek(pos, 0)
