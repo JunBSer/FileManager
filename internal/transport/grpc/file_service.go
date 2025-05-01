@@ -43,3 +43,7 @@ func (srv *FileService) Append(stream proto.FileService_AppendServer) error {
 func (srv *FileService) MoveFile(ctx context.Context, req *proto.OperationRequest) (*proto.StatusResponse, error) {
 	return nil, nil
 }
+
+func (srv *FileService) ListDirectory(ctx context.Context, req *proto.DirectoryRequest) (*proto.DirectoryRequest, error) {
+	return nil, nil
+}

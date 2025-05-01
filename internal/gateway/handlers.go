@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"bufio"
+	"context"
+	"encoding/json"
 	myErr "github.com/JunBSer/FileManager/internal/gateway/error"
 	"github.com/JunBSer/FileManager/pkg/logger"
 	"github.com/JunBSer/proto_fileManager/pkg/api/proto"
@@ -374,4 +376,60 @@ func (h Handler) MoveFile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 
+}
+
+func (h Handler) EncodeDirectoryResponse(
+	w http.ResponseWriter,
+	entries []*proto.DirectoryEntry,
+	dirPath string,
+	ctx context.Context,
+) {
+	lg := logger.GetLoggerFromContext(ctx)
+	type Entry struct {
+		Name        string `json:"name"`
+		IsDirectory bool   `json:"is_directory"`
+	}
+
+	jsonEntries := make([]Entry, 0, len(entries))
+	for _, e := range entries {
+		jsonEntries = append(jsonEntries, Entry{
+			Name:        e.Name,
+			IsDirectory: e.IsDir,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(jsonEntries); err != nil {
+		lg.Error(ctx, "Error encoding JSON response",
+			zap.String("path", dirPath),
+			zap.Error(err))
+	}
+}
+
+func (h Handler) ListDir(w http.ResponseWriter, r *http.Request) {
+	lg := logger.GetLoggerFromContext(r.Context())
+
+	if r.Method != "GET" {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+
+	dirPath, err := h.HandleFilePath("path", w, r)
+	if err != nil {
+		lg.Debug(r.Context(), "Error handling file path", zap.String("fileName", dirPath))
+		return
+	}
+
+	res, err := h.gw.client.Cl.ListDirectory(r.Context(),
+		&proto.DirectoryRequest{Path: dirPath})
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError),
+			http.StatusInternalServerError)
+		lg.Error(r.Context(), "Error getting directory listing",
+			zap.String("path", dirPath),
+			zap.Error(err))
+		return
+	}
+
+	h.EncodeDirectoryResponse(w, res.Entries, dirPath, r.Context())
 }

@@ -2,7 +2,7 @@ package gateway
 
 import "github.com/gorilla/mux"
 
-func (h *Handler) SetupRoutes(r *mux.Router) {
+func (h Handler) SetupRoutes(r *mux.Router) {
 	filesRouter := r.PathPrefix("/api/v1/files").Subrouter()
 
 	filesRouter.HandleFunc("/upload", h.Upload).Methods("POST")

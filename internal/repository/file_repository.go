@@ -35,6 +35,11 @@ type FileStorageRepo struct {
 	readSize    int64
 }
 
+type DirectoryEntry struct {
+	Name  string
+	IsDir bool
+}
+
 type FileHandle interface {
 	Seek(offset int64, whence int) (ret int64, err error)
 	Write(b []byte) (n int, err error)
@@ -209,4 +214,33 @@ func (repo *FileStorageRepo) ReadFile(ctx context.Context, file FileHandle, pos 
 	lg.Debug(ctx, fmt.Sprintf("Read %d bytes from file", bRead))
 
 	return buf, int64(bRead), err
+}
+
+func (repo *FileStorageRepo) ListDir(ctx context.Context, path string) ([]DirectoryEntry, error) {
+	lg := logger.GetLoggerFromContext(ctx)
+
+	fullPath := repo.BuildPath(path)
+	err := repo.ValidatePath(ctx, fullPath)
+	if err != nil {
+		lg.Debug(ctx, "Error to list dir: path is invalid")
+	}
+
+	entries, err := os.ReadDir(fullPath)
+	if err != nil {
+		lg.Error(ctx, "Error listing dir", zap.String("path", fullPath), zap.Error(err))
+	}
+
+	result := make([]DirectoryEntry, 0, len(entries))
+	for _, entry := range entries {
+		if err != nil {
+			continue
+		}
+
+		result = append(result, DirectoryEntry{
+			Name:  entry.Name(),
+			IsDir: entry.IsDir(),
+		})
+	}
+
+	return result, nil
 }
