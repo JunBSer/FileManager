@@ -10,8 +10,8 @@ import (
 )
 
 type Client struct {
-	conn *grpc.ClientConn
-	cl   proto.FileServiceClient
+	Conn *grpc.ClientConn
+	Cl   proto.FileServiceClient
 }
 
 func NewClient(ctx context.Context, host string, port int) (*Client, error) {
@@ -26,12 +26,12 @@ func NewClient(ctx context.Context, host string, port int) (*Client, error) {
 	logger.GetLoggerFromContext(ctx).Info(ctx, "Grpc client connection has been created")
 
 	cl := proto.NewFileServiceClient(conn)
-	return &Client{conn: conn,
-		cl: cl}, nil
+	return &Client{Conn: conn,
+		Cl: cl}, nil
 }
 
 func (c *Client) Close(ctx context.Context) {
-	err := c.conn.Close()
+	err := c.Conn.Close()
 	if err != nil {
 		logger.GetLoggerFromContext(ctx).Error(ctx, "Error to close conn", zap.Error(err))
 		panic(err)

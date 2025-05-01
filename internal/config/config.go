@@ -1,9 +1,9 @@
 package config
 
 import (
+	"github.com/JunBSer/FileManager/internal/gateway"
 	"github.com/JunBSer/FileManager/internal/repository"
 	"github.com/JunBSer/FileManager/internal/transport/grpc"
-	"github.com/JunBSer/FileManager/internal/transport/http"
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
@@ -12,8 +12,9 @@ type (
 		App     App
 		Logger  Log
 		GRPc    grpc.Config
-		Http    http.Config
+		Http    gateway.Config
 		Storage repository.FileStorageConfig
+		gw      gateway.GwConfig
 	}
 
 	App struct {

@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/JunBSer/FileManager/pkg/logger"
 	"go.uber.org/zap"
@@ -48,30 +47,20 @@ func New(storagePath string, maxSize int64) *FileStorageRepo {
 }
 
 func (repo *FileStorageRepo) BuildPath(path string) string {
-	path = filepath.Clean(path)
 	path = filepath.Join(repo.storagePath, path)
+	path = filepath.Clean(path)
 	return path
 }
 
 func (repo *FileStorageRepo) ValidatePath(ctx context.Context, path string) error {
-
 	lg := logger.GetLoggerFromContext(ctx)
 
-	_, err := os.Stat(path)
-	if err != nil {
-		lg.Error(ctx, "File storage path does not exist", zap.String("path", path))
-		return err
-	}
-
-	rel, err := filepath.Rel(repo.storagePath, path)
-	if err != nil {
-		lg.Error(ctx, "Cannot get relative path")
-		return err
-	}
-
-	if !(!strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel)) {
-		lg.Error(ctx, "Path is not valid", zap.String("path", path))
-		return errors.New(fmt.Sprintf("Path is not valid, Path: %s", path))
+	if !strings.HasPrefix(path, repo.storagePath) {
+		lg.Error(ctx, "Path traversal detected",
+			zap.String("path", path),
+			zap.String("root", repo.storagePath),
+		)
+		return fmt.Errorf("path %q is outside root directory", path)
 	}
 
 	return nil
@@ -89,12 +78,17 @@ func (repo *FileStorageRepo) GetFileHandle(ctx context.Context, path string, ope
 	file, err := os.Open(fullPath)
 	if err != nil {
 		lg.Error(ctx, "Error opening file", zap.String("path", fullPath), zap.Error(err))
-		if openOption == Open {
+		if openOption == Open && os.IsNotExist(err) {
 			return nil, err
 		}
 	} else {
 		lg.Info(ctx, "File was opened", zap.String("path", fullPath))
 		return file, nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0777); err != nil {
+		lg.Error(ctx, "Error creating directory", zap.String("path", fullPath), zap.Error(err))
+		return nil, err
 	}
 
 	file, err = os.Create(fullPath)
@@ -135,13 +129,13 @@ func (repo *FileStorageRepo) CopyFile(ctx context.Context, srcPath string, dstPa
 
 	err := repo.ValidatePath(ctx, dstFullPath)
 	if err != nil {
-		lg.Debug(ctx, "Error to copy file: dstPath path is inavalid")
+		lg.Debug(ctx, "Error to copy file: dstPath path is invalid")
 		return err
 	}
 
 	err = repo.ValidatePath(ctx, srcFullPath)
 	if err != nil {
-		lg.Debug(ctx, "Error to copy file: srcPath path is inavalid")
+		lg.Debug(ctx, "Error to copy file: srcPath path is invalid")
 		return err
 	}
 
@@ -185,7 +179,7 @@ func (repo *FileStorageRepo) DeleteFile(ctx context.Context, path string) error 
 
 	err := repo.ValidatePath(ctx, fullPath)
 	if err != nil {
-		lg.Debug(ctx, "Error to delete file: path is inavalid")
+		lg.Debug(ctx, "Error to delete file: path is invalid")
 		return err
 	}
 

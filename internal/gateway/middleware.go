@@ -1,4 +1,4 @@
-package http
+package gateway
 
 import (
 	"context"
@@ -29,8 +29,21 @@ func LoggerMiddleware(ctx context.Context, next http.Handler) http.Handler {
 			return
 		}
 
-		logger.GetLoggerFromContext(ctx).Info(ctx,  "Requested: ",zap.String("Request method", r.Method),zap.String("Request URL", r.RequestURI), zap.String("UUID", uuid.String()))
+		logger.GetLoggerFromContext(ctx).Info(ctx, "Requested: ", zap.String("Request method", r.Method), zap.String("Request URL", r.RequestURI), zap.String("UUID", uuid.String()))
 
 		r.WithContext(context.WithValue(r.Context(), logger.RequestID, uuid))
+		r.WithContext(context.WithValue(r.Context(), logger.Key, logger.GetLoggerFromContext(ctx)))
+
+		next.ServeHTTP(w, r)
+		return
+	})
+}
+
+func TransportFromServMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Transfer-Encoding", "binary")
+
+		next.ServeHTTP(w, r)
 	})
 }
