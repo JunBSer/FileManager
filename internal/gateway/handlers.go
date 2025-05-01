@@ -84,6 +84,9 @@ func (h Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, h.gw.maxSize<<20)
+	defer r.Body.Close()
+
 	if err := r.ParseMultipartForm(h.gw.maxSize << 20); err != nil {
 		http.Error(w, "Invalid file upload: "+err.Error(), http.StatusBadRequest)
 		return
@@ -205,6 +208,9 @@ func (h Handler) Append(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, h.gw.maxSize<<20)
+	defer r.Body.Close()
+
 	if err := r.ParseMultipartForm(h.gw.maxSize << 20); err != nil {
 		http.Error(w, "Invalid file upload: "+err.Error(), http.StatusBadRequest)
 		return
@@ -265,6 +271,9 @@ func (h Handler) Overwrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, h.gw.maxSize<<20)
+	defer r.Body.Close()
 
 	if err := r.ParseMultipartForm(h.gw.maxSize << 20); err != nil {
 		http.Error(w, "Invalid file upload: "+err.Error(), http.StatusBadRequest)

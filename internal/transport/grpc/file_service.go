@@ -16,7 +16,6 @@ func NewService(srv service.FileService) *FileService {
 }
 
 func (srv *FileService) Upload(stream proto.FileService_UploadServer) error {
-
 	return nil
 }
 
@@ -44,6 +43,6 @@ func (srv *FileService) MoveFile(ctx context.Context, req *proto.OperationReques
 	return nil, nil
 }
 
-func (srv *FileService) ListDirectory(ctx context.Context, req *proto.DirectoryRequest) (*proto.DirectoryRequest, error) {
+func (srv *FileService) ListDirectory(ctx context.Context, r *proto.DirectoryRequest) (*proto.DirectoryResponse, error) {
 	return nil, nil
 }

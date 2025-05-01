@@ -12,4 +12,5 @@ func (h Handler) SetupRoutes(r *mux.Router) {
 	filesRouter.HandleFunc("/overwrite", h.Overwrite).Methods("PUT")
 	filesRouter.HandleFunc("/delete", h.Delete).Methods("DELETE")
 	filesRouter.HandleFunc("/move", h.MoveFile).Methods("POST")
+	r.HandleFunc("/list", h.ListDir).Methods("GET")
 }
