@@ -6,14 +6,15 @@ import (
 	"github.com/JunBSer/FileManager/pkg/logger"
 	"go.uber.org/zap"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
 const (
-	Open = iota
-	CreateAndOpen
+	Read       = os.O_RDONLY
+	CreateAndW = os.O_CREATE | os.O_WRONLY
 )
 
 type FileStorageConfig struct {
@@ -24,10 +25,12 @@ type FileStorageConfig struct {
 
 type FileRepository interface {
 	GetFileHandle(ctx context.Context, path string, openOption int) (FileHandle, error)
-	AppendData(ctx context.Context, file FileHandle, data []byte, pos int64) (int, error)
+	AppendData(ctx context.Context, file FileHandle, data []byte, pos int64) (int64, error)
 	CopyFile(ctx context.Context, srcPath string, dstPath string) error
 	DeleteFile(ctx context.Context, path string) error
 	ReadFile(ctx context.Context, file FileHandle, pos int64) ([]byte, int64, error)
+	ListDir(ctx context.Context, path string) ([]DirectoryEntry, error)
+	GetReadSize() int64
 }
 type FileStorageRepo struct {
 	storagePath string
@@ -45,10 +48,15 @@ type FileHandle interface {
 	Write(b []byte) (n int, err error)
 	Close() error
 	Read(b []byte) (n int, err error)
+	Stat() (fs.FileInfo, error)
 }
 
-func New(storagePath string, maxSize int64) *FileStorageRepo {
-	return &FileStorageRepo{storagePath: storagePath, maxSize: maxSize}
+func New(storagePath string, maxSize int64, readSize int64) *FileStorageRepo {
+	return &FileStorageRepo{storagePath: storagePath, maxSize: maxSize, readSize: readSize}
+}
+
+func (repo *FileStorageRepo) GetReadSize() int64 {
+	return repo.readSize
 }
 
 func (repo *FileStorageRepo) BuildPath(path string) string {
@@ -80,10 +88,10 @@ func (repo *FileStorageRepo) GetFileHandle(ctx context.Context, path string, ope
 		return nil, err
 	}
 
-	file, err := os.Open(fullPath)
+	file, err := os.OpenFile(fullPath, openOption, 0777)
 	if err != nil {
 		lg.Error(ctx, "Error opening file", zap.String("path", fullPath), zap.Error(err))
-		if openOption == Open && os.IsNotExist(err) {
+		if openOption == Read && os.IsNotExist(err) {
 			return nil, err
 		}
 	} else {
@@ -106,7 +114,7 @@ func (repo *FileStorageRepo) GetFileHandle(ctx context.Context, path string, ope
 	return file, nil
 }
 
-func (repo *FileStorageRepo) AppendData(ctx context.Context, file FileHandle, data []byte, pos int64) (int, error) {
+func (repo *FileStorageRepo) AppendData(ctx context.Context, file FileHandle, data []byte, pos int64) (int64, error) {
 	var err error
 	lg := logger.GetLoggerFromContext(ctx)
 
@@ -123,7 +131,7 @@ func (repo *FileStorageRepo) AppendData(ctx context.Context, file FileHandle, da
 
 	lg.Info(ctx, fmt.Sprintf("Wrote %d bytes to file", wCnt))
 
-	return wCnt, err
+	return int64(wCnt), err
 }
 
 func (repo *FileStorageRepo) CopyFile(ctx context.Context, srcPath string, dstPath string) error {
@@ -144,7 +152,7 @@ func (repo *FileStorageRepo) CopyFile(ctx context.Context, srcPath string, dstPa
 		return err
 	}
 
-	srcFile, err := repo.GetFileHandle(ctx, srcFullPath, Open)
+	srcFile, err := repo.GetFileHandle(ctx, srcFullPath, Read)
 	if err != nil {
 		lg.Debug(ctx, "Error to copy file: srcFile is not exist")
 		return err
@@ -157,7 +165,7 @@ func (repo *FileStorageRepo) CopyFile(ctx context.Context, srcPath string, dstPa
 		}
 	}()
 
-	dstFile, err := repo.GetFileHandle(ctx, dstFullPath, CreateAndOpen)
+	dstFile, err := repo.GetFileHandle(ctx, dstFullPath, CreateAndW)
 	if err != nil {
 		lg.Debug(ctx, "Error to copy file: can not create and write file")
 	}

@@ -442,3 +442,5 @@ func (h Handler) ListDir(w http.ResponseWriter, r *http.Request) {
 
 	h.EncodeDirectoryResponse(w, res.Entries, dirPath, r.Context())
 }
+
+// Handlers with a bit large logic :) <3
