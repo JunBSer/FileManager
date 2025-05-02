@@ -15,6 +15,7 @@ import (
 const (
 	Read       = os.O_RDONLY
 	CreateAndW = os.O_CREATE | os.O_WRONLY
+	Write      = os.O_RDWR
 )
 
 type FileStorageConfig struct {
@@ -26,12 +27,13 @@ type FileStorageConfig struct {
 type FileRepository interface {
 	GetFileHandle(ctx context.Context, path string, openOption int) (FileHandle, error)
 	AppendData(ctx context.Context, file FileHandle, data []byte, pos int64) (int64, error)
-	CopyFile(ctx context.Context, srcPath string, dstPath string) error
+	MoveFile(ctx context.Context, dstPath, srcPath string) error
 	DeleteFile(ctx context.Context, path string) error
 	ReadFile(ctx context.Context, file FileHandle, pos int64) ([]byte, int64, error)
 	ListDir(ctx context.Context, path string) ([]DirectoryEntry, error)
 	GetReadSize() int64
 }
+
 type FileStorageRepo struct {
 	storagePath string
 	maxSize     int64
@@ -91,7 +93,8 @@ func (repo *FileStorageRepo) GetFileHandle(ctx context.Context, path string, ope
 	file, err := os.OpenFile(fullPath, openOption, 0777)
 	if err != nil {
 		lg.Error(ctx, "Error opening file", zap.String("path", fullPath), zap.Error(err))
-		if openOption == Read && os.IsNotExist(err) {
+		if openOption != CreateAndW && os.IsNotExist(err) {
+			lg.Info(ctx, "File is not exists", zap.String("path", fullPath), zap.Error(err))
 			return nil, err
 		}
 	} else {
@@ -251,4 +254,30 @@ func (repo *FileStorageRepo) ListDir(ctx context.Context, path string) ([]Direct
 	}
 
 	return result, nil
+}
+
+func (repo *FileStorageRepo) MoveFile(ctx context.Context, dstPath, srcPath string) error {
+	srcFullPath := repo.BuildPath(srcPath)
+	dstFullPath := repo.BuildPath(dstPath)
+
+	lg := logger.GetLoggerFromContext(ctx)
+
+	err := repo.ValidatePath(ctx, dstFullPath)
+	if err != nil {
+		lg.Debug(ctx, "Error to copy file: dstPath path is invalid")
+		return err
+	}
+
+	err = repo.ValidatePath(ctx, srcFullPath)
+	if err != nil {
+		lg.Debug(ctx, "Error to copy file: srcPath path is invalid")
+		return err
+	}
+
+	err = os.Rename(srcFullPath, dstFullPath)
+	if err != nil {
+		lg.Debug(ctx, "Error to copy file: can not move file")
+		return err
+	}
+	return nil
 }
