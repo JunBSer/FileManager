@@ -3,7 +3,9 @@ package grpc
 import (
 	"context"
 	"github.com/JunBSer/FileManager/internal/service"
+	"github.com/JunBSer/FileManager/pkg/logger"
 	"github.com/JunBSer/proto_fileManager/pkg/api/proto"
+	"go.uber.org/zap"
 )
 
 type FileService struct {
@@ -16,20 +18,20 @@ func NewService(srv service.FileService) *FileService {
 }
 
 func (srv *FileService) Upload(stream proto.FileService_UploadServer) error {
-	if err := srv.srv.Upload(stream); err != nil {
-		stream.SendAndClose(&proto.StatusResponse{Status: proto.Status_STATUS_ERROR})
-		return err
+	err := srv.srv.Upload(stream)
+
+	status := proto.Status_STATUS_SUCCESS
+	if err != nil {
+		status = proto.Status_STATUS_ERROR
+		logger.GetLoggerFromContext(stream.Context()).Error(context.Background(), "Upload failed", zap.Error(err))
 	}
-	stream.SendAndClose(&proto.StatusResponse{Status: proto.Status_STATUS_SUCCESS})
-	return nil
+	return stream.SendAndClose(&proto.StatusResponse{Status: status})
 }
 
 func (srv *FileService) Download(req *proto.FileRequest, stream proto.FileService_DownloadServer) error {
 	if err := srv.srv.Download(req, stream); err != nil {
-		stream.RecvMsg(&proto.StatusResponse{Status: proto.Status_STATUS_ERROR})
 		return err
 	}
-	stream.RecvMsg(&proto.StatusResponse{Status: proto.Status_STATUS_SUCCESS})
 	return nil
 }
 
@@ -44,10 +46,8 @@ func (srv *FileService) Delete(ctx context.Context, req *proto.FileRequest) (*pr
 func (srv *FileService) Read(req *proto.FileRequest, stream proto.FileService_ReadServer) error {
 	err := srv.srv.Read(req, stream)
 	if err != nil {
-		stream.RecvMsg(&proto.StatusResponse{Status: proto.Status_STATUS_ERROR})
 		return err
 	}
-	stream.RecvMsg(&proto.StatusResponse{Status: proto.Status_STATUS_SUCCESS})
 	return nil
 }
 

@@ -44,7 +44,7 @@ func (srv *FileService) ProcessDownload(file repository.FileHandle, stream proto
 	bufLen := srv.repo.GetReadSize()
 	for {
 		buf := make([]byte, bufLen)
-		_, err := file.Read(buf)
+		n, err := file.Read(buf)
 		if err != nil {
 			if err == io.EOF {
 				return nil
@@ -52,7 +52,7 @@ func (srv *FileService) ProcessDownload(file repository.FileHandle, stream proto
 			return err
 		}
 
-		err = stream.Send(&proto.FileChunk{FileName: fileName, Content: buf})
+		err = stream.Send(&proto.FileChunk{FileName: fileName, Content: buf[:n]})
 		if err != nil {
 			return err
 		}
@@ -100,7 +100,7 @@ func (srv *FileService) Append(stream proto.FileService_AppendServer) error {
 		return err
 	}
 
-	file, err := srv.repo.GetFileHandle(ctx, data.FileName, repository.CreateAndW)
+	file, err := srv.repo.GetFileHandle(ctx, data.FileName, repository.Write)
 	if err != nil {
 		lg.Error(ctx, "Error to open file", zap.Error(err))
 		return err
@@ -135,7 +135,7 @@ func (srv *FileService) Overwrite(stream proto.FileService_OverwriteFileServer) 
 		return err
 	}
 
-	file, err := srv.repo.GetFileHandle(ctx, data.FileName, repository.CreateAndW)
+	file, err := srv.repo.GetFileHandle(ctx, data.FileName, repository.Write)
 	if err != nil {
 		lg.Error(ctx, "Error to open file", zap.Error(err))
 		return err
@@ -220,17 +220,9 @@ func (srv *FileService) MoveFile(ctx context.Context, req *proto.OperationReques
 	lg.Info(ctx, "MoveFile is in process")
 	destPath, srcPath := req.Destination, req.Source
 
-	err := srv.repo.CopyFile(ctx, srcPath, destPath)
+	err := srv.repo.MoveFile(ctx, srcPath, destPath)
 	if err != nil {
 		lg.Error(ctx, "Error to move file", zap.Error(err))
-		return err
-	}
-
-	err = srv.repo.DeleteFile(ctx, srcPath)
-	if err != nil {
-		lg.Error(ctx, "Error to delete file while moving", zap.Error(err))
-		srv.repo.DeleteFile(ctx, destPath)
-
 		return err
 	}
 
