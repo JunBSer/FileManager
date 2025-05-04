@@ -21,7 +21,7 @@ type Server struct {
 	Listener net.Listener
 }
 
-func New(ctx context.Context, grpcConfig *Config, srv service.FileService) (*Server, error) {
+func New(ctx context.Context, grpcConfig *Config, srv *service.FileService) (*Server, error) {
 	lg := logger.GetLoggerFromContext(ctx)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", (*grpcConfig).GRPCHost, (*grpcConfig).GRPCPort))
@@ -31,12 +31,13 @@ func New(ctx context.Context, grpcConfig *Config, srv service.FileService) (*Ser
 	}
 	lg.Info(ctx, fmt.Sprintf("Created grpc server listening on %s:%d", (*grpcConfig).GRPCHost, (*grpcConfig).GRPCPort))
 
-	var opts []grpc.ServerOption
+	var opts []grpc.ServerOption = []grpc.ServerOption{grpc.ChainUnaryInterceptor(unContextWithLogger(lg)), grpc.ChainStreamInterceptor(srvStrContextWithLogger(lg))}
 
 	grpcServer := grpc.NewServer(opts...)
+
 	lg.Info(ctx, "Created grpc server")
 
-	pb.RegisterFileServiceServer(grpcServer, NewService(srv))
+	pb.RegisterFileServiceServer(grpcServer, NewService(*srv))
 	lg.Info(ctx, "GRPC service has been registered")
 
 	return &Server{Grpc: grpcServer, Listener: lis}, nil

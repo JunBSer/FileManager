@@ -12,6 +12,10 @@ type wrappedStream struct {
 	ctx context.Context
 }
 
+func (w *wrappedStream) Context() context.Context {
+	return w.ctx
+}
+
 func unContextWithLogger(l logger.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
 		l.Info(ctx, "request started", zap.String("method", info.FullMethod))

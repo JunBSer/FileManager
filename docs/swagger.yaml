@@ -1,0 +1,252 @@
+basePath: /api/v1/files
+definitions:
+  models.ErrorResponse:
+    properties:
+      code:
+        example: 400
+        type: integer
+      message:
+        example: invalid request parameters
+        type: string
+    type: object
+  models.FileEntry:
+    properties:
+      is_directory:
+        example: false
+        type: boolean
+      name:
+        example: report.pdf
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Api for file management
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: Swagger Example API
+  version: "1.0"
+paths:
+  /append:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Appends data to an existing file
+      parameters:
+      - description: File to append
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Path to the file
+        in: query
+        name: file_path
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: 'Status: {status}'
+          schema:
+            type: string
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Append data to a file
+      tags:
+      - appending
+  /delete:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a file based on the provided path
+      parameters:
+      - description: Path to the file
+        in: query
+        name: file_path
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: 'Status: {status}'
+          schema:
+            type: string
+        "404":
+          description: File not found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Delete a file
+      tags:
+      - deleting
+  /download:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a file based on the provided path
+      parameters:
+      - description: Path to the file
+        in: query
+        name: file_path
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: The requested file
+          schema:
+            type: file
+        "404":
+          description: File not found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Download a file
+      tags:
+      - downloading
+  /list:
+    get:
+      consumes:
+      - application/json
+      description: Returns a list of files and directories in the specified path
+      parameters:
+      - description: Directory path
+        in: query
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of directory entries
+          schema:
+            items:
+              $ref: '#/definitions/models.FileEntry'
+            type: array
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: List directory contents
+      tags:
+      - listing
+  /move:
+    post:
+      consumes:
+      - application/json
+      description: Moves a file to a new location
+      parameters:
+      - description: Source path
+        in: query
+        name: src_path
+        required: true
+        type: string
+      - description: Destination path
+        in: query
+        name: dst_path
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: 'Status: {status}'
+          schema:
+            type: string
+        "404":
+          description: File not found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Move a file
+      tags:
+      - moving
+  /read:
+    get:
+      consumes:
+      - application/json
+      description: Returns the content of a specific file
+      parameters:
+      - description: Path to the file
+        in: query
+        name: file_path
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Content of the file
+          schema:
+            type: file
+        "404":
+          description: File not found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Read a file
+      tags:
+      - reading
+  /upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Accepts a multipart file upload
+      parameters:
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Path to save the file
+        example: '"/documents/report.pdf"'
+        in: query
+        name: file_path
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: 'Status: {status}'
+          schema:
+            type: string
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Uploads a file
+      tags:
+      - uploading
+swagger: "2.0"

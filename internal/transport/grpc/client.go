@@ -7,6 +7,7 @@ import (
 	"github.com/JunBSer/proto_fileManager/pkg/api/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Client struct {
@@ -15,7 +16,7 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context, host string, port int) (*Client, error) {
-	var opts []grpc.DialOption
+	var opts []grpc.DialOption = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 
 	conn, err := grpc.NewClient(fmt.Sprintf("%s:%d", host, port), opts...)
 	if err != nil {

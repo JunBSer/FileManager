@@ -19,9 +19,9 @@ const (
 )
 
 type FileStorageConfig struct {
-	storagePath string `env:"FILE_STORAGE_PATH" envDefault:"/var/tmp/storage"`
-	maxSize     int64  `env:"FILE_MAX_SIZE" envDefault:"10"`
-	readSize    int64  `env:"FILE_READ_SIZE" envDefault:"2048"`
+	StoragePath string `env:"FILE_STORAGE_PATH" envDefault:"/var/tmp/storage"`
+	MaxSize     int64  `env:"FILE_MAX_SIZE" envDefault:"10"`
+	ReadSize    int64  `env:"FILE_READ_SIZE" envDefault:"2048"`
 }
 
 type FileRepository interface {
@@ -54,7 +54,20 @@ type FileHandle interface {
 }
 
 func New(storagePath string, maxSize int64, readSize int64) *FileStorageRepo {
-	return &FileStorageRepo{storagePath: storagePath, maxSize: maxSize, readSize: readSize}
+	exePath, err := os.Executable()
+	if err != nil {
+		return nil
+	}
+
+	exeDir := filepath.Dir(exePath)
+
+	fullPath := filepath.Join(exeDir, storagePath)
+
+	if err := os.MkdirAll(fullPath, 0o755); err != nil {
+		return nil
+	}
+
+	return &FileStorageRepo{storagePath: fullPath, maxSize: maxSize, readSize: readSize}
 }
 
 func (repo *FileStorageRepo) GetReadSize() int64 {
@@ -67,15 +80,30 @@ func (repo *FileStorageRepo) BuildPath(path string) string {
 	return path
 }
 
-func (repo *FileStorageRepo) ValidatePath(ctx context.Context, path string) error {
+func (repo *FileStorageRepo) ValidatePath(ctx context.Context, userPath string) error {
 	lg := logger.GetLoggerFromContext(ctx)
 
-	if !strings.HasPrefix(path, repo.storagePath) {
-		lg.Error(ctx, "Path traversal detected",
-			zap.String("path", path),
-			zap.String("root", repo.storagePath),
-		)
-		return fmt.Errorf("path %q is outside root directory", path)
+	root, err := filepath.Abs(repo.storagePath)
+	if err != nil {
+		lg.Error(ctx, "cannot make storagePath absolute", zap.Error(err))
+		return fmt.Errorf("internal error")
+	}
+
+	abs, err := filepath.Abs(userPath)
+	if err != nil {
+		lg.Error(ctx, "cannot make user path absolute", zap.String("userPath", userPath), zap.Error(err))
+		return fmt.Errorf("invalid path")
+	}
+
+	rel, err := filepath.Rel(root, abs)
+	if err != nil {
+		lg.Error(ctx, "cannot compute relative path", zap.String("abs", abs), zap.Error(err))
+		return fmt.Errorf("invalid path")
+	}
+
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		lg.Error(ctx, "path traversal detected", zap.String("abs", abs), zap.String("root", root))
+		return fmt.Errorf("path %q is outside root directory", userPath)
 	}
 
 	return nil
@@ -85,35 +113,39 @@ func (repo *FileStorageRepo) GetFileHandle(ctx context.Context, path string, ope
 	fullPath := repo.BuildPath(path)
 	lg := logger.GetLoggerFromContext(ctx)
 
-	err := repo.ValidatePath(ctx, fullPath)
-	if err != nil {
+	if err := repo.ValidatePath(ctx, fullPath); err != nil {
 		return nil, err
 	}
 
-	file, err := os.OpenFile(fullPath, openOption, 0777)
-	if err != nil {
-		lg.Error(ctx, "Error opening file", zap.String("path", fullPath), zap.Error(err))
-		if openOption != CreateAndW && os.IsNotExist(err) {
-			lg.Info(ctx, "File is not exists", zap.String("path", fullPath), zap.Error(err))
+	if openOption == Read {
+		if _, err := os.Stat(fullPath); err != nil {
 			return nil, err
 		}
-	} else {
-		lg.Info(ctx, "File was opened", zap.String("path", fullPath))
-		return file, nil
+		f, err := os.Open(fullPath)
+		if err != nil {
+			lg.Error(ctx, "Error opening file for read", zap.String("path", fullPath), zap.Error(err))
+			return nil, err
+		}
+		return f, nil
 	}
 
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0777); err != nil {
-		lg.Error(ctx, "Error creating directory", zap.String("path", fullPath), zap.Error(err))
-		return nil, err
-	}
-
-	file, err = os.Create(fullPath)
+	file, err := os.OpenFile(fullPath, openOption, 0o777)
 	if err != nil {
-		lg.Error(ctx, "Error creating file", zap.String("path", fullPath), zap.Error(err))
-		return nil, err
+		if !os.IsNotExist(err) {
+			lg.Error(ctx, "Error opening file for write", zap.String("path", fullPath), zap.Error(err))
+			return nil, err
+		}
+		if mkErr := os.MkdirAll(filepath.Dir(fullPath), 0o755); mkErr != nil {
+			lg.Error(ctx, "Error creating directory", zap.String("path", fullPath), zap.Error(mkErr))
+			return nil, mkErr
+		}
+		file, err = os.Create(fullPath)
+		if err != nil {
+			lg.Error(ctx, "Error creating file", zap.String("path", fullPath), zap.Error(err))
+			return nil, err
+		}
+		lg.Info(ctx, "File was created", zap.String("path", fullPath))
 	}
-
-	lg.Info(ctx, "File was created", zap.String("path", fullPath))
 	return file, nil
 }
 
@@ -256,7 +288,7 @@ func (repo *FileStorageRepo) ListDir(ctx context.Context, path string) ([]Direct
 	return result, nil
 }
 
-func (repo *FileStorageRepo) MoveFile(ctx context.Context, dstPath, srcPath string) error {
+func (repo *FileStorageRepo) MoveFile(ctx context.Context, srcPath, dstPath string) error {
 	srcFullPath := repo.BuildPath(srcPath)
 	dstFullPath := repo.BuildPath(dstPath)
 

@@ -31,14 +31,12 @@ func New(serviceName, lvlInfo string) Logger {
 	switch lvlInfo {
 	case "debug":
 		zapLevel = zap.DebugLevel
-		config.EncoderConfig.FunctionKey = "func"
 	case "info":
 		zapLevel = zap.InfoLevel
 	case "warn":
 		zapLevel = zap.WarnLevel
 	case "error":
 		zapLevel = zap.ErrorLevel
-		config.EncoderConfig.FunctionKey = "func"
 	default:
 		zapLevel = zap.InfoLevel
 	}

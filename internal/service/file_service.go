@@ -13,6 +13,10 @@ type FileService struct {
 	repo repository.FileRepository
 }
 
+func New(repo repository.FileRepository) *FileService {
+	return &FileService{repo: repo}
+}
+
 func (srv *FileService) ProcessUpload(
 	ctx context.Context,
 	stream proto.FileService_UploadServer,
@@ -159,7 +163,7 @@ func (srv *FileService) Download(req *proto.FileRequest, stream proto.FileServic
 	lg.Info(ctx, "Download is in process")
 
 	fileName := req.FileName
-	file, err := srv.repo.GetFileHandle(ctx, fileName, repository.CreateAndW)
+	file, err := srv.repo.GetFileHandle(ctx, fileName, repository.Read)
 	if err != nil {
 		lg.Error(ctx, "Error to open file", zap.Error(err))
 		return err
@@ -184,7 +188,7 @@ func (srv *FileService) Read(req *proto.FileRequest, stream proto.FileService_Re
 
 	fileName := req.FileName
 
-	file, err := srv.repo.GetFileHandle(ctx, fileName, repository.CreateAndW)
+	file, err := srv.repo.GetFileHandle(ctx, fileName, repository.Read)
 	if err != nil {
 		lg.Error(ctx, "Error to open file", zap.Error(err))
 		return err

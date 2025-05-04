@@ -14,7 +14,7 @@ type (
 		GRPc    grpc.Config
 		Http    gateway.Config
 		Storage repository.FileStorageConfig
-		gw      gateway.GwConfig
+		Gw      gateway.GwConfig
 	}
 
 	App struct {

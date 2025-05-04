@@ -6,6 +6,7 @@ import (
 	"github.com/JunBSer/FileManager/internal/transport/grpc"
 	"github.com/JunBSer/FileManager/pkg/logger"
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 	"net/http"
 )
 
@@ -15,7 +16,7 @@ type Config struct {
 }
 
 type GwConfig struct {
-	maxSize int64 `env:"MAX_SIZE" envDefault:"32"`
+	MaxSize int64 `env:"FILE_MAX_SIZE" envDefault:"32"`
 }
 type Gateway struct {
 	client  *grpc.Client
@@ -23,33 +24,45 @@ type Gateway struct {
 	maxSize int64
 }
 
-func New(ctx *context.Context, grpcConfig *grpc.Config, httpConfig Config, gwConf GwConfig) (*Gateway, error) {
-	client, err := grpc.NewClient(*ctx, grpcConfig.GRPCHost, grpcConfig.GRPCPort)
+func New(ctx context.Context, grpcConfig *grpc.Config, httpConfig *Config, gwConf *GwConfig) (*Gateway, error) {
+	client, err := grpc.NewClient(ctx, grpcConfig.GRPCHost, grpcConfig.GRPCPort)
 	if err != nil {
 		return nil, err
 	}
 
-	logger.GetLoggerFromContext(*ctx).Info(*ctx, "Gateway created successfully")
-
 	router := mux.NewRouter()
-	rest := &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", httpConfig.Host, httpConfig.Port),
-		Handler: LoggerMiddleware(*ctx, CorsMiddleware(router)),
+
+	gw := &Gateway{
+		client:  client,
+		maxSize: gwConf.MaxSize,
 	}
 
-	return &Gateway{client: client, srv: rest, maxSize: gwConf.maxSize}, nil
+	handler := NewGatewayHandler(gw)
+
+	handler.SetupRoutes(ctx, router)
+
+	gw.srv = &http.Server{
+		Addr:    fmt.Sprintf("%s:%d", httpConfig.Host, httpConfig.Port),
+		Handler: router,
+	}
+
+	logger.GetLoggerFromContext(ctx).Info(ctx, "Gateway created successfully")
+	return gw, nil
 }
 
 func (gw *Gateway) Start(ctx context.Context) error {
-	logger.GetLoggerFromContext(ctx).Info(ctx, "Starting HTTP server __ gateway__")
+	logger.GetLoggerFromContext(ctx).Info(ctx, "Starting HTTP server __ gateway__", zap.String("addr", gw.srv.Addr))
 	return gw.srv.ListenAndServe()
 }
 
-func (gw *Gateway) Stop(ctx context.Context) error {
+func (gw *Gateway) Stop(ctx context.Context) {
 	logger.GetLoggerFromContext(ctx).Info(ctx, "Stopping gRPC server")
 	err := gw.srv.Shutdown(context.Background())
 	if err != nil {
-		logger.GetLoggerFromContext(ctx).Info(ctx, "Failed to shutdown HTTP server")
+		logger.GetLoggerFromContext(ctx).Info(ctx, "Failed to grpc HTTP server")
 	}
-	return err
+}
+
+func (gw *Gateway) GetRouter() *mux.Router {
+	return (gw.srv.Handler).(*mux.Router)
 }
