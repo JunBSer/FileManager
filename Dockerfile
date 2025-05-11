@@ -15,4 +15,8 @@ WORKDIR /app
 
 COPY --from=builder /app/bin .
 
+RUN mkdir -p /app/FileManager/configs
+
+COPY --from=builder /app/configs/local.env /app/FileManager/configs/local.env
+
 CMD ["/app/app", "/app/gateway"]
