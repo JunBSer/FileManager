@@ -20,4 +20,5 @@ COPY --from=builder /app/configs/local.env /app/configs/local.env
 
 EXPOSE 8080
 
-CMD ["/app/app", "/app/gateway"]
+CMD ["sh", "-c", "/app/gateway & /app/app"]
+
