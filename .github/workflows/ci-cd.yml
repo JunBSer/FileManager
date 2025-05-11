@@ -11,6 +11,10 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: ./FileManager
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,8 +26,8 @@ jobs:
 
       - name: Create .env file from GitHub Secrets
         run: |
-          mkdir -p FileManager/configs
-          cat <<EOF > FileManager/configs/local.env
+          mkdir -p configs
+          cat <<EOF > configs/local.env
           LOGGER_LEVEL=${{ secrets.LOGGER_LEVEL }}
           SERVICE_NAME=${{ secrets.SERVICE_NAME }}
           VERSION=${{ secrets.VERSION }}
@@ -43,6 +47,4 @@ jobs:
         run: docker build -t file-service .
 
       - name: Run Docker container
-        run: docker run --rm \
-          -p 8080:8080 \
-           file-service
+        run: docker run --rm -p 8080:8080 file-service
