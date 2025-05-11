@@ -37,7 +37,7 @@ jobs:
           EOF
 
       - name: Run tests
-        run: go test ./…
+        run: go test ./...
 
       - name: Build Docker image
         run: docker build -t file-service .
