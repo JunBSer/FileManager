@@ -1,0 +1,48 @@
+name: Go App CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.24
+
+      - name: Create .env file from GitHub Secrets
+        run: |
+          mkdir -p FileManager/configs
+          cat <<EOF > FileManager/configs/local.env
+          LOGGER_LEVEL=${{ secrets.LOGGER_LEVEL }}
+          SERVICE_NAME=${{ secrets.SERVICE_NAME }}
+          VERSION=${{ secrets.VERSION }}
+          GRPC_PORT=${{ secrets.GRPC_PORT }}
+          GRPC_HOST=${{ secrets.GRPC_HOST }}
+          HTTP_PORT=${{ secrets.HTTP_PORT }}
+          HTTP_HOST=${{ secrets.HTTP_HOST }}
+          FILE_STORAGE_PATH=${{ secrets.FILE_STORAGE_PATH }}
+          FILE_MAX_SIZE=${{ secrets.FILE_MAX_SIZE }}
+          FILE_READ_SIZE=${{ secrets.FILE_READ_SIZE }}
+          EOF
+
+      - name: Run tests
+        run: go test ./…
+
+      - name: Build Docker image
+        run: docker build -t file-service .
+
+      - name: Run Docker container
+        run: docker run --rm \
+          -p 8080:8080 \
+           file-service

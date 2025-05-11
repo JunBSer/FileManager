@@ -9,6 +9,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -83,16 +85,37 @@ func (repo *FileStorageRepo) BuildPath(path string) string {
 func (repo *FileStorageRepo) ValidatePath(ctx context.Context, userPath string) error {
 	lg := logger.GetLoggerFromContext(ctx)
 
+	if userPath == repo.storagePath {
+		lg.Debug(ctx, "path is empty")
+		return fmt.Errorf("path cannot be empty")
+	}
+
 	root, err := filepath.Abs(repo.storagePath)
 	if err != nil {
-		lg.Error(ctx, "cannot make storagePath absolute", zap.Error(err))
+		lg.Debug(ctx, "cannot make storagePath absolute", zap.Error(err))
 		return fmt.Errorf("internal error")
 	}
 
 	abs, err := filepath.Abs(userPath)
 	if err != nil {
-		lg.Error(ctx, "cannot make user path absolute", zap.String("userPath", userPath), zap.Error(err))
+		lg.Debug(ctx, "cannot make user path absolute", zap.String("userPath", userPath), zap.Error(err))
 		return fmt.Errorf("invalid path")
+	}
+	invalidChars := `[*?"<>|]`
+	if runtime.GOOS == "windows" {
+		invalidChars = `[*?"<>|:]`
+	}
+
+	re := regexp.MustCompile("[" + regexp.QuoteMeta(invalidChars) + "]")
+	if match := re.FindString(filepath.Base(abs)); match != "" {
+		lg.Error(ctx, "invalid characters in path",
+			zap.String("path", abs),
+			zap.String("invalidChar", match),
+		)
+		return fmt.Errorf(
+			"path contains invalid character %q",
+			match,
+		)
 	}
 
 	rel, err := filepath.Rel(root, abs)
@@ -102,7 +125,7 @@ func (repo *FileStorageRepo) ValidatePath(ctx context.Context, userPath string) 
 	}
 
 	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		lg.Error(ctx, "path traversal detected", zap.String("abs", abs), zap.String("root", root))
+		lg.Debug(ctx, "path traversal detected", zap.String("abs", abs), zap.String("root", root))
 		return fmt.Errorf("path %q is outside root directory", userPath)
 	}
 
@@ -266,11 +289,13 @@ func (repo *FileStorageRepo) ListDir(ctx context.Context, path string) ([]Direct
 	err := repo.ValidatePath(ctx, fullPath)
 	if err != nil {
 		lg.Debug(ctx, "Error to list dir: path is invalid")
+		return nil, err
 	}
 
 	entries, err := os.ReadDir(fullPath)
 	if err != nil {
 		lg.Error(ctx, "Error listing dir", zap.String("path", fullPath), zap.Error(err))
+		return nil, err
 	}
 
 	result := make([]DirectoryEntry, 0, len(entries))
