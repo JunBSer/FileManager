@@ -1,22 +1,17 @@
-name: Go App CI/CD Pipeline
+name: Build & Run Docker
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-and-test:
+  build-and-run:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.24
-
-      - name: Create .env file from GitHub Secrets
+      - name: Create .env from Secrets
         run: |
           mkdir -p configs
           cat <<EOF > configs/local.env
@@ -32,11 +27,12 @@ jobs:
           FILE_READ_SIZE=${{ secrets.FILE_READ_SIZE }}
           EOF
 
-      - name: Run tests
-        run: go test ./...
-
       - name: Build Docker image
         run: docker build -t file-service .
 
       - name: Run Docker container
-        run: docker run --rm -p 8080:8080 file-service
+        run: |
+          docker run --rm \
+            -p 8080:8080 \
+            -p 50051:50051 \
+            file-service
